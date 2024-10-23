@@ -102,11 +102,11 @@ class DatasetAudioTrain(Dataset):
         metadata = metadata.drop(drop_rows)
         self.metadata = metadata
             
-        print("Drop {}/{} utterances ({:.2f}/{:.2f}h), shorter than {:.2f}s".format(
-            drop_utt, orig_utt, drop_len / 3600, orig_len / 3600, self.chunk_size
+        print("Drop {}/{} utterances ({:.2f}/{:.2f} mins), shorter than {:.2f}s".format(
+            drop_utt, orig_utt, drop_len / 60, orig_len / 60, self.chunk_size
         ))
-        print('Used utterances, ({:.2f} h)'.format(
-            (orig_len-drop_len) / 3600
+        print('Used utterances, ({:.2f} mins)'.format(
+            (orig_len-drop_len) / 60
         ))
         print('Resample pool: {}'.format(list(self.resample_pool.keys())))
 

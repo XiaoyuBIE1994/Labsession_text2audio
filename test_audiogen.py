@@ -30,7 +30,7 @@ ext = 'wav'
 #         audio_len += utt_len
 #         line = '{},{},{},{}\n'.format(audio_id, audio_filepath, sr, length)
 #         f.write(line)
-#     print('Total audio len: {:.2f}h'.format(audio_len/3600))
+#     print('Total audio len: {:.2f} mins'.format(audio_len/60))
 
 
 from audiocraft.solvers.builders import (
@@ -80,68 +80,83 @@ print("Total # of params: {:.2f} M".format(sum(p.numel() for p in model.paramete
 
 
 # train
-ckpt_path = 'last_ckpt.pth'
-total_epoch = cfg.optim.epochs
-model = model.to(cfg.device)
-model.train()
-for epo in range(total_epoch):
-    for audio_data in tqdm(dataloader, total=len(dataloader)):
-        # prepare data
-        x = audio_data.to(cfg.device)
-        y = x.clone()
-        metrics = {}
+# ckpt_path = 'last_ckpt.pth'
+# total_epoch = cfg.optim.epochs
+# model = model.to(cfg.device)
+# model.train()
+# for epo in range(total_epoch):
+#     for audio_data in tqdm(dataloader, total=len(dataloader)):
+#         # prepare data
+#         x = audio_data.to(cfg.device)
+#         y = x.clone()
+#         metrics = {}
 
-        # forward
-        qres = model(x)
-        y_pred = qres.x
+#         # forward
+#         qres = model(x)
+#         y_pred = qres.x
 
-        # discrimilator loss
-        d_losses: dict = {}
-        for adv_name, adversary in adv_losses.items():
-            disc_loss = adversary.train_adv(y_pred, y)
-            d_losses[f'd_{adv_name}'] = disc_loss
-        metrics['d_loss'] = torch.sum(torch.stack(list(d_losses.values())))
+#         # discrimilator loss
+#         d_losses: dict = {}
+#         for adv_name, adversary in adv_losses.items():
+#             disc_loss = adversary.train_adv(y_pred, y)
+#             d_losses[f'd_{adv_name}'] = disc_loss
+#         metrics['d_loss'] = torch.sum(torch.stack(list(d_losses.values())))
         
-        balanced_losses: dict = {}
-        other_losses: dict = {}
+#         balanced_losses: dict = {}
+#         other_losses: dict = {}
 
-        # penalty from quantization
-        if qres.penalty is not None and qres.penalty.requires_grad:
-            other_losses['penalty'] = qres.penalty  # penalty term from the quantizer
+#         # penalty from quantization
+#         if qres.penalty is not None and qres.penalty.requires_grad:
+#             other_losses['penalty'] = qres.penalty  # penalty term from the quantizer
 
-        # adversarial losses
-        for adv_name, adversary in adv_losses.items():
-            adv_loss, feat_loss = adversary(y_pred, y)
-            balanced_losses[f'adv_{adv_name}'] = adv_loss
-            balanced_losses[f'feat_{adv_name}'] = feat_loss
+#         # adversarial losses
+#         for adv_name, adversary in adv_losses.items():
+#             adv_loss, feat_loss = adversary(y_pred, y)
+#             balanced_losses[f'adv_{adv_name}'] = adv_loss
+#             balanced_losses[f'feat_{adv_name}'] = feat_loss
 
-        # auxiliary losses
-        for loss_name, criterion in aux_losses.items():
-            loss = criterion(y_pred, y)
-            balanced_losses[loss_name] = loss
+#         # auxiliary losses
+#         for loss_name, criterion in aux_losses.items():
+#             loss = criterion(y_pred, y)
+#             balanced_losses[loss_name] = loss
 
-        # backprop losses that are not handled by balancer
-        other_loss = torch.tensor(0., device=cfg.device)
-        if 'penalty' in other_losses:
-            other_loss += other_losses['penalty']
-        if other_loss.requires_grad:
-            other_loss.backward(retain_graph=True)
+#         # backprop losses that are not handled by balancer
+#         other_loss = torch.tensor(0., device=cfg.device)
+#         if 'penalty' in other_losses:
+#             other_loss += other_losses['penalty']
+#         if other_loss.requires_grad:
+#             other_loss.backward(retain_graph=True)
         
-        # balancer losses backward
-        metrics['g_loss'] = balancer.backward(balanced_losses, y_pred)
+#         # balancer losses backward
+#         metrics['g_loss'] = balancer.backward(balanced_losses, y_pred)
 
-        # optimize
-        optimizer.step()
-        optimizer.zero_grad()
+#         # optimize
+#         optimizer.step()
+#         optimizer.zero_grad()
 
-    # save model every epoch
-    print('====> Epoch: {}, d_loss: {:.3f}, g_loss: {:.3f}'.format(epo, metrics['d_loss'], metrics['g_loss']))
-    torch.save({
-            'epoch': epo,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'metrics': metrics,
-            }, ckpt_path)
+#     # save model every epoch
+#     print('====> Epoch: {}, d_loss: {:.3f}, g_loss: {:.3f}'.format(epo, metrics['d_loss'], metrics['g_loss']))
+#     torch.save({
+#             'epoch': epo,
+#             'model_state_dict': model.state_dict(),
+#             'optimizer_state_dict': optimizer.state_dict(),
+#             'metrics': metrics,
+#             }, ckpt_path)
+    
+    # if epo % 10 == 0:
+    #     torch.save({
+    #         'epoch': epo,
+    #         'model_state_dict': model.state_dict(),
+    #         'optimizer_state_dict': optimizer.state_dict(),
+    #         'metrics': metrics,
+    #         }, f'epo{epo}_ckpt.pth')
+    #     x, fs = torchaudio.load('/home/ids/xbie/Data/toy_dataset/LJ001-0001.wav')
+    #     x = julius.resample_frac(x, old_sr=fs, new_sr=32000)
+    #     model.eval()
+    #     codes, scale = model.encode(x[None,])
+    #     y = model.decode(codes, scale)[0].detach()
+    #     torchaudio.save(f'example_recon_{epo}.wav', y, sample_rate=32000)
+
 
 
 # Load the model
@@ -152,11 +167,21 @@ model.cpu().eval()
 
 ## Load an audio, re-sample to 32kHz
 # x, fs = torchaudio.load('example.wav')
-x, fs = torchaudio.load('/home/xbie/Data/toy_dataset/LJ001-0001.wav')
-x = julius.resample_frac(x, old_sr=fs, new_sr=32000)
-print('Audio length: {:.1f}s'.format(x.shape[-1]/32000))
+x, fs = torchaudio.load('/home/ids/xbie/Data/toy_dataset/LJ001-0001.wav')
+x1 = julius.resample_frac(x, old_sr=fs, new_sr=16000)
+print('Audio length: {:.1f}s'.format(x1.shape[-1]/16000))
 
 ## Encoder
-codes, scale = model.encode(x[None,])
-y = model.decode(codes, scale)
-torchaudio.save('example_recon.wav', y[0], sample_rate=32000)
+codes, scale = model.encode(x1[None,])
+y = model.decode(codes, scale)[0].detach()
+torchaudio.save('example_recon.wav', y, sample_rate=16000)
+
+
+from audiocraft.models import CompressionModel
+## Use the pretrained model from MetaAI
+model_fb = CompressionModel.get_pretrained('facebook/encodec_32khz')
+x2 = julius.resample_frac(x1, old_sr=16000, new_sr=32000)
+codes, scale = model_fb.encode(x2[None,])
+y_fb = model_fb.decode(codes, scale)[0].detach()
+y_fb = julius.resample_frac(x2, old_sr=32000, new_sr=16000)
+torchaudio.save('example_recon_fb.wav', y_fb, sample_rate=16000)

@@ -26,3 +26,4 @@ torchvision==0.16.1
 torchtext==0.16.1
 pesq
 pystoi
+ipython
