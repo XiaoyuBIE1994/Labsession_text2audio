@@ -8,7 +8,7 @@ sample_rate: 16000
 channels: 1
 device: cuda
 seed: 2036
-toy_data: /home/ids/xbie/Data/toy_dataset
+toy_data: ./toy_dataset
 
 model:
   device: ${device}
