@@ -181,26 +181,6 @@ dataset:
   lufs_norm_db: -27.0
   lufs_var: 2.0
 
-# # solver hyperparameters
-# evaluate:
-#   every: 25
-#   num_workers: 5
-#   metrics:
-#     visqol: false
-#     sisnr: true
-# generate:
-#   every: 25
-#   num_workers: 5
-#   audio:
-#     sample_rate: ${sample_rate}
-
-# checkpointing schedule
-# checkpoint:
-#   save_last: true
-#   save_every: 25
-#   keep_last: 10
-#   keep_every_states: null
-
 # optimization hyperparameters
 optim:
   epochs: 20
